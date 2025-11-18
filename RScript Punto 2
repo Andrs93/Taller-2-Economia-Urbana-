@@ -1,0 +1,638 @@
+###############################################################################
+# Economía Urbana - Taller 2
+# Juan Camilo Arévalo, Andrés Serrano, Juan Felipe Duarte
+# 17 de noviembre de 2025
+###############################################################################
+
+###############################################################################
+# PUNTO 2
+###############################################################################
+
+# Sección 1: Limpieza y recolección de datos:
+
+#Consola limpia para iniciar a trabajar:
+rm(list = ls())
+
+#Instalamos pacman para poder instalar todos los paquetes
+if (!require("pacman")) install.packages("pacman")  
+library(pacman)
+
+#Se instalan paquetes necesarios con el comando p_load
+p_load(tidyverse, rio, skimr, here, leaflet, lubridate, modelsummary, viridis, sf,
+       osmdata, dplyr, haven, stargazer, ggspatial, ragg, scales, fixest, FNN, 
+       sandwich, lmtest, splines, cowplot, segmented, purrr)
+
+#Procedemos a definir el directorio
+usuario <- Sys.info()[["user"]]
+
+if (usuario == "JUANC") {
+  directorio <- "C:/Users/JUANC/OneDrive - Universidad de los Andes/A-Uniandes/2025-20/Economía Urbana/Talleres/Taller 2" # Juan C.
+  
+} else if (usuario == " ") {
+  directorio <- " " # Andrés
+  
+} else if (usuario == " ") {
+  directorio <- " " # JF
+  
+} else if (usuario == " ") {
+  directorio <- " " # Ingresar aquí el directorio para replicación
+  
+} else {
+  stop("Usuario no reconocido. Por favor agregue su ruta.")
+}
+setwd(directorio)
+getwd()
+
+#1) Importación del shapefile de la ciudad de Chicago:
+
+chicago_sf <- st_read("Data/Boundaries - Census Tracts - 2010/geo_export_a4ade1ed-743c-4dd8-ad1a-89b46b222cec.shp")
+chicago_sf <- st_as_sf(chicago_sf)
+chicago_sf <- st_make_valid(chicago_sf)
+
+# Importación de los datos:
+census <- read_dta("Data/Combined_data_Panel.dta")
+
+#------------------------------------------------------------------------------
+
+#2) Construcción de los Mapas y Evolución Racial
+# A - Estadísticas Descriptivas de la Población:
+glimpse(census)
+summary(census$year)
+head(panel)
+
+#Para ver cuántos años hay en la base
+unique(census$year)
+years <- c(2000, 2015, 2020)
+
+#Primero, miramos la evolución a través de los años:
+# Creamos proporciones raciales en el panel
+census <- census %>%
+  mutate(
+    p_white = White_Pop / Total_Pop,
+    p_black = Black_Pop / Total_Pop,
+    p_hisp  = Hispanic_Pop / Total_Pop,
+    p_asian = Asian_Pop / Total_Pop,
+    p_other = Other_Pop / Total_Pop,
+    p_minority = 1 - p_white
+  )
+
+# Obtenemos las estadísticas descriptivas por año
+desc_stats <- census %>%
+  group_by(year) %>%
+  summarise(
+    mean_black  = mean(p_black, na.rm = TRUE),
+    mean_hisp   = mean(p_hisp, na.rm = TRUE),
+    mean_white  = mean(p_white, na.rm = TRUE),
+    mean_minority = mean(p_minority, na.rm = TRUE),
+    mean_inc = mean(Median_Inc, na.rm = TRUE),
+    median_inc = median(Median_Inc, na.rm = TRUE),
+  )
+
+print(desc_stats)
+
+#Exportación de resultados
+stargazer(desc_stats,
+          type = "latex",
+          summary = FALSE,
+          title = "Estadísticas descriptivas por año",
+          out = "Outputs/desc_stats.tex")
+
+
+#-------------------------------------------------------------------------------
+#3) Construcción de los mapas, uniendo ambas bases
+panel <- chicago_sf %>%
+  left_join(census, by = c("geoid10" = "FIPS"))
+
+#Mapas para Afroamericanos:
+plots_black <- lapply(years, function(yr) {
+  panel %>%
+    filter(year == yr) %>%
+    ggplot() +
+    geom_sf(aes(fill = p_black), color = "white") +
+    scale_fill_viridis_c(option = "viridis") +
+    labs(subtitle = as.character(yr)) +
+    theme_minimal() +
+    theme(
+      axis.text = element_blank(),
+      axis.title = element_blank(),
+      legend.position = "none",     # QUITAMOS LA LEYENDA
+      plot.subtitle = element_text(hjust = 0.5, size = 12)
+    )
+})
+
+# Extraemos la leyenda desde un mapa "dummy"
+legend_plot <- ggplot() +
+  geom_sf(data = panel %>% filter(year == 2000),
+          aes(fill = p_black), color = NA) +
+  scale_fill_viridis_c(option = "viridis", name = "Proporción") +
+  theme_minimal()
+
+legend <- cowplot::get_legend(
+  legend_plot +
+    theme(legend.position = "right",
+          legend.title = element_text(size = 12),
+          legend.text = element_text(size = 10))
+)
+
+# Juntamos los mapas sin leyenda
+maps_row <- plot_grid(plotlist = plots_black, ncol = 3)
+
+# Agregamos la leyenda al lado derecho
+maps_with_legend <- plot_grid(maps_row, legend, rel_widths = c(0.9, 0.1))
+
+# Agregamos TÍTULO GENERAL
+final_map_black <- ggdraw() +
+  draw_label("Evolución de la proporción de Afroamericanos en Chicago (2000–2020)",
+             x = 0.5, y = 0.98, hjust = 0.5, size = 16) +
+  draw_plot(maps_with_legend, y = 0, height = 0.95)
+
+# Mostrar el mapa
+final_map_black
+
+
+#Mapas para Hispanos:
+plots_hisp <- lapply(years, function(yr) {
+  panel %>%
+    filter(year == yr) %>%
+    ggplot() +
+    geom_sf(aes(fill = p_hisp), color = "white") +
+    scale_fill_viridis_c(option = "viridis") +
+    labs(subtitle = as.character(yr)) +
+    theme_minimal() +
+    theme(
+      axis.text = element_blank(),
+      axis.title = element_blank(),
+      legend.position = "none",     # QUITAMOS LA LEYENDA
+      plot.subtitle = element_text(hjust = 0.5, size = 12)
+    )
+})
+
+# Extraemos la leyenda desde un mapa "dummy"
+legend_plot <- ggplot() +
+  geom_sf(data = panel %>% filter(year == 2000),
+          aes(fill = p_hisp), color = NA) +
+  scale_fill_viridis_c(option = "viridis", name = "Proporción") +
+  theme_minimal()
+
+legend <- cowplot::get_legend(
+  legend_plot +
+    theme(legend.position = "right",
+          legend.title = element_text(size = 12),
+          legend.text = element_text(size = 10))
+)
+
+# Juntamos los mapas sin leyenda
+maps_row <- plot_grid(plotlist = plots_hisp, ncol = 3)
+
+# Agregamos la leyenda al lado derecho
+maps_with_legend <- plot_grid(maps_row, legend, rel_widths = c(0.9, 0.1))
+
+# Agregamos TÍTULO GENERAL
+final_map_hisp <- ggdraw() +
+  draw_label("Evolución de la proporción de Hispanos en Chicago (2000–2020)",
+             x = 0.5, y = 0.98, hjust = 0.5, size = 16) +
+  draw_plot(maps_with_legend, y = 0, height = 0.95)
+
+# Mostrar el mapa
+final_map_hisp
+
+#Mapas para Ingresos:
+plots_inc <- lapply(years, function(yr) {
+  panel %>%
+    filter(year == yr) %>%
+    ggplot() +
+    geom_sf(aes(fill = Median_Inc), color = "white") +
+    scale_fill_viridis_c(option = "viridis") +
+    labs(subtitle = as.character(yr)) +
+    theme_minimal() +
+    theme(
+      axis.text = element_blank(),
+      axis.title = element_blank(),
+      legend.position = "none",     # QUITAMOS LA LEYENDA
+      plot.subtitle = element_text(hjust = 0.5, size = 12)
+    )
+})
+
+# Extraemos la leyenda desde un mapa "dummy"
+legend_plot <- ggplot() +
+  geom_sf(data = panel %>% filter(year == 2000),
+          aes(fill = Median_Inc), color = NA) +
+  scale_fill_viridis_c(option = "viridis", name = "USD") +
+  theme_minimal()
+
+legend <- cowplot::get_legend(
+  legend_plot +
+    theme(legend.position = "right",
+          legend.title = element_text(size = 12),
+          legend.text = element_text(size = 10))
+)
+
+# Juntamos los mapas sin leyenda
+maps_row <- plot_grid(plotlist = plots_inc, ncol = 3)
+
+# Agregamos la leyenda al lado derecho
+maps_with_legend <- plot_grid(maps_row, legend, rel_widths = c(0.9, 0.1))
+
+# Agregamos TÍTULO GENERAL
+final_map_inc <- ggdraw() +
+  draw_label("Evolución de la proporción de Ingreso Medio en Chicago (2000–2020)",
+             x = 0.5, y = 0.98, hjust = 0.5, size = 16) +
+  draw_plot(maps_with_legend, y = 0, height = 0.95)
+
+# Mostrar el mapa
+final_map_inc
+
+"Se observa que parece haber correlación, barrios de negros y latinos tienen ingresos
+más bajos"
+
+#Construimos la matriz de correlaciones para esas razas y el ingreso:
+panel_cor <- panel %>%
+  st_drop_geometry() %>%      # quitamos la geometría para evitar errores
+  dplyr::select(year, p_black, p_hisp, Median_Inc) %>%
+  na.omit()
+
+correlations <- cor(panel_cor[, c("p_black", "p_hisp", "Median_Inc")])
+
+#Exportación de resultados
+stargazer(correlations,
+          type = "latex",
+          summary = FALSE,
+          title = "Matriz de Correlaciones",
+          out = "Outputs/correlations.tex")
+
+#-------------------------------------------------------------------------------
+#4) Índices
+
+# Índice de Disimilitud
+#Primero, creamos la función que me va a construir el índice:
+dindex <- function(a, b) {
+  A <- sum(a, na.rm = TRUE)
+  B <- sum(b, na.rm = TRUE)
+  0.5 * sum(abs((a / A) - (b / B)), na.rm = TRUE)
+}
+
+#Se construyen los índices para cada año, según:
+# A) Afros - Blancos
+# B) Hispanos - Blancos
+indices_d <- panel %>%
+  st_drop_geometry() %>%
+  group_by(year) %>%
+  summarise(
+    D_black_white = dindex(Black_Pop, White_Pop),
+    D_hisp_white = dindex(Hispanic_Pop, White_Pop),
+  )
+
+indices_d
+
+#Exportación de resultados
+stargazer(indices_d,
+          type = "latex",
+          summary = FALSE,
+          title = "Índices de Disimilitud para Afros e Hispanos",
+          out = "Outputs/dindex.tex")
+
+
+#Índice de Aislamiento
+#Primero, creamos la función que me va a construir el índice:
+isoindex <- function(a, total) {
+  A <- sum(a, na.rm = TRUE)
+  sum((a / A) * (a / total), na.rm = TRUE)
+}
+
+indices_i <- panel %>%
+  st_drop_geometry() %>%
+  group_by(year) %>%
+  summarise(
+    P_black = isoindex(Black_Pop, Total_Pop),
+    P_hisp = isoindex(Hispanic_Pop, Total_Pop)
+  )
+
+indices_i
+
+#Exportación de resultados
+stargazer(indices_i,
+          type = "latex",
+          summary = FALSE,
+          title = "Índices de Aislamiento para Afros e Hispanos",
+          out = "Outputs/isoindex.tex")
+
+#-------------------------------------------------------------------------------
+#5) Tipping Point
+#Minorías
+#Arrancamos con la división de la muestra para búsqueda y validación:
+set.seed(1234)
+panel_data <- panel %>%
+  mutate(split_sample = sample(c("search", "test"), n(),
+                               replace = TRUE, prob = c(2/3, 1/3)))
+
+#Creamos el cambio poblacional para cada una de las dos ventanas (2000-2015 y 2015-2020)
+ventana1 <- panel_data %>%
+  st_drop_geometry() %>%
+  filter(year %in% c(2000, 2015)) %>%
+  dplyr::select(geoid10, year, p_white, p_minority, p_black, p_hisp, Median_Inc) %>%
+  pivot_wider(names_from = year, values_from = c(p_white, p_minority, p_black, p_hisp, Median_Inc),
+              names_sep = "_") %>%
+  filter(!is.na(p_white_2000), !is.na(p_white_2015))
+
+ventana2 <- panel_data %>%
+  st_drop_geometry() %>%
+  filter(year %in% c(2015, 2020)) %>%
+  dplyr::select(geoid10, year, p_white, p_minority, p_black, p_hisp, Median_Inc) %>%
+  pivot_wider(names_from = year, values_from = c(p_white, p_minority, p_black, p_hisp, Median_Inc),
+              names_sep = "_") %>%
+  filter(!is.na(p_white_2015), !is.na(p_white_2020))
+
+ventana1 <- ventana1 %>%
+  mutate(delta_white_A = p_white_2015 - p_white_2000,
+         pmin_A = p_minority_2000,
+         pblack_A = p_black_2000,
+         phisp_A = p_hisp_2000)
+
+ventana2 <- ventana2 %>%
+  mutate(delta_white_B = p_white_2020 - p_white_2015,
+         pmin_B = p_minority_2015,
+         pblack_B = p_black_2015,
+         phisp_B = p_hisp_2015)
+
+
+
+#Para visualizar barrios mixtos o en transición:
+ventana1_sample <- ventana1 %>%
+  filter(pmin_A < 0.6) 
+
+ventana2_sample <- ventana2 %>%
+  filter(pmin_B < 0.6)
+
+#Cálculo del Ancho de Banda
+#fullN <- nrow(panel) # total de obs
+#cityN <- nrow(panel_data_search)
+#bw <- 3 * (fullN / cityN)^0.2 
+
+
+#Función Método de Punto Fijo:
+find_fixed_point <- function(data, x, y) {
+  mean_y <- mean(data[[y]], na.rm = TRUE) # punto donde el cambio observado en el vecindario es m?s parecido al cambio promedio de toda la ciudad.
+  data <- data %>%
+    mutate(deviation = abs(get(y) - mean_y))
+  
+  tipping_point <- data %>%
+    filter(deviation == min(deviation, na.rm = TRUE)) %>%
+    pull(!!sym(x))
+  
+  return(tipping_point[1])
+}
+
+Punto_Min_A <- find_fixed_point(ventana1_sample, "pmin_A", "delta_white_A")
+Punto_Min_A
+
+Punto_Min_B <- find_fixed_point(ventana2_sample, "pmin_B", "delta_white_B")
+Punto_Min_B
+
+
+#Repetimos el proceso para afroamericanos e hispanos:
+Punto_Afro_A <- find_fixed_point(ventana1_sample, "pblack_A", "delta_white_A")
+Punto_Afro_A
+
+Punto_Afro_B <- find_fixed_point(ventana2_sample, "pblack_B", "delta_white_B")
+Punto_Afro_B
+
+Punto_Hisp_A <- find_fixed_point(ventana1_sample, "phisp_A", "delta_white_A")
+Punto_Hisp_A
+
+Punto_Hisp_B <- find_fixed_point(ventana2_sample, "phisp_B", "delta_white_B")
+Punto_Hisp_B
+
+#Tabla Tipping Points
+tipping_points <- data.frame(
+  Grupo = c("Minorías", "Afroamericanos", "Hispanos"),
+  `2000_2015` = c(Punto_Min_A, Punto_Afro_A, Punto_Hisp_A),
+  `2015_2020` = c(Punto_Min_B, Punto_Afro_B, Punto_Hisp_B)
+)
+
+#Exportación de resultados
+stargazer(
+  tipping_points,
+  summary = FALSE,
+  rownames = FALSE,
+  title = "Tipping Points por Grupo Étnico y Período",
+  label = "tab:tipping_points",
+  digits = 3,
+  out = "Outputs/tipping_points.tex"
+)
+
+#Mapas con los cambios:
+
+#Tipping Points Minorías
+# Ventana 2000–2015
+panel_data <- panel_data %>%
+  mutate(tp_2000_2015 = case_when(
+    year == 2000 & p_minority <= Punto_Min_A ~ "Debajo",
+    year == 2000 & p_minority >  Punto_Min_A ~ "Encima",
+    TRUE ~ NA_character_
+  ))
+
+# Ventana 2015–2020
+panel_data <- panel_data %>%
+  mutate(tp_2015_2020 = case_when(
+    year == 2015 & p_minority <= Punto_Min_B ~ "Debajo",
+    year == 2015 & p_minority >  Punto_Min_B ~ "Encima",
+    TRUE ~ NA_character_
+  ))
+
+panel_min <- panel_data %>%
+  group_by(geoid10) %>%
+  summarize(
+    tp_2000_2015 = first(na.omit(tp_2000_2015)),
+    tp_2015_2020 = first(na.omit(tp_2015_2020))
+  )
+
+panel_min <- panel_min %>%
+  mutate(changed = case_when(
+    tp_2000_2015 == "Debajo" & tp_2015_2020 == "Encima" ~ "Cambió (Subió)",
+    tp_2000_2015 == "Encima" & tp_2015_2020 == "Debajo" ~ "Cambió (Bajó)",
+    TRUE ~ "No cambió"
+  ))
+
+minmap_data <- panel_data %>%
+  st_drop_geometry() %>%
+  left_join(panel_min, by = "geoid10") %>%
+  st_as_sf()
+
+
+#Mapa de Variaciones Minorías
+ggplot(minmap_data) +
+  geom_sf(aes(fill = changed), color = "white", size = 0.2) +
+  scale_fill_manual(
+    values = c("Cambió (Subió)" = "red", "Cambió (Bajó)" = "green", "No cambió" = "grey80"),
+    name = "Tipo"
+  ) +
+  labs(
+    title = "Cambios en el Tipping Point de Minorías"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "bottom",
+    plot.title = element_text(face = "bold", size = 16)
+  )
+
+#Tipping Points Afros
+# Ventana 2000–2015
+panel_data <- panel_data %>%
+  mutate(tp_2000_2015 = case_when(
+    year == 2000 & p_minority <= Punto_Afro_A ~ "Debajo",
+    year == 2000 & p_minority >  Punto_Afro_A ~ "Encima",
+    TRUE ~ NA_character_
+  ))
+
+# Ventana 2015–2020
+panel_data <- panel_data %>%
+  mutate(tp_2015_2020 = case_when(
+    year == 2015 & p_minority <= Punto_Afro_B ~ "Debajo",
+    year == 2015 & p_minority >  Punto_Afro_B ~ "Encima",
+    TRUE ~ NA_character_
+  ))
+
+panel_min <- panel_data %>%
+  group_by(geoid10) %>%
+  summarize(
+    tp_2000_2015 = first(na.omit(tp_2000_2015)),
+    tp_2015_2020 = first(na.omit(tp_2015_2020))
+  )
+
+panel_min <- panel_min %>%
+  mutate(changed = case_when(
+    tp_2000_2015 == "Debajo" & tp_2015_2020 == "Encima" ~ "Cambió (Subió)",
+    tp_2000_2015 == "Encima" & tp_2015_2020 == "Debajo" ~ "Cambió (Bajó)",
+    TRUE ~ "No cambió"
+  ))
+
+minmap_data <- panel_data %>%
+  st_drop_geometry() %>%
+  left_join(panel_min, by = "geoid10") %>%
+  st_as_sf()
+
+
+#Mapa de Variaciones Afros
+ggplot(minmap_data) +
+  geom_sf(aes(fill = changed), color = "white", size = 0.2) +
+  scale_fill_manual(
+    values = c("Cambió (Subió)" = "red", "Cambió (Bajó)" = "green", "No cambió" = "grey80"),
+    name = "Tipo"
+  ) +
+  labs(
+    title = "Cambios en el Tipping Point de Afros"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "bottom",
+    plot.title = element_text(face = "bold", size = 16)
+  )
+
+
+#Tipping Points Hispanos
+# Ventana 2000–2015
+panel_data <- panel_data %>%
+  mutate(tp_2000_2015 = case_when(
+    year == 2000 & p_minority <= Punto_Hisp_A ~ "Debajo",
+    year == 2000 & p_minority >  Punto_Hisp_A ~ "Encima",
+    TRUE ~ NA_character_
+  ))
+
+# Ventana 2015–2020
+panel_data <- panel_data %>%
+  mutate(tp_2015_2020 = case_when(
+    year == 2015 & p_minority <= Punto_Hisp_B ~ "Debajo",
+    year == 2015 & p_minority >  Punto_Hisp_B ~ "Encima",
+    TRUE ~ NA_character_
+  ))
+
+panel_min <- panel_data %>%
+  group_by(geoid10) %>%
+  summarize(
+    tp_2000_2015 = first(na.omit(tp_2000_2015)),
+    tp_2015_2020 = first(na.omit(tp_2015_2020))
+  )
+
+panel_min <- panel_min %>%
+  mutate(changed = case_when(
+    tp_2000_2015 == "Debajo" & tp_2015_2020 == "Encima" ~ "Cambió (Subió)",
+    tp_2000_2015 == "Encima" & tp_2015_2020 == "Debajo" ~ "Cambió (Bajó)",
+    TRUE ~ "No cambió"
+  ))
+
+minmap_data <- panel_data %>%
+  st_drop_geometry() %>%
+  left_join(panel_min, by = "geoid10") %>%
+  st_as_sf()
+
+
+#Mapa de Variaciones Hispanos
+ggplot(minmap_data) +
+  geom_sf(aes(fill = changed), color = "white", size = 0.2) +
+  scale_fill_manual(
+    values = c("Cambió (Subió)" = "red", "Cambió (Bajó)" = "green", "No cambió" = "grey80"),
+    name = "Tipo"
+  ) +
+  labs(
+    title = "Cambios en el Tipping Point de Hispanos"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "bottom",
+    plot.title = element_text(face = "bold", size = 16)
+  )
+
+
+################################################################################
+# Anexos - Gráficos Adicionales/Prueba
+#mapA <- panel_min %>%
+#  left_join(ventana1, by = "geoid10")
+
+#mapB <- panel_min %>%
+#  left_join(ventana2, by = "geoid10")
+
+
+#map_A_plot <- ggplot(mapA) +
+# geom_sf(aes(fill = tp_2000_2015), color = "white") +
+#  scale_fill_manual(values = c("Debajo" = "steelblue", "Encima" = "firebrick"),
+#                    name = "Clasificación") +
+#  labs(title = "2000–2015") +
+#  theme_minimal() +
+# theme(
+#    axis.text = element_blank(),
+#    axis.title = element_blank(),
+#    legend.position = "none"
+#  )
+#
+#map_B_plot <- ggplot(mapB) +
+#  geom_sf(aes(fill = tp_2015_2020), color = "white") +
+#  scale_fill_manual(values = c("Debajo" = "steelblue", "Encima" = "firebrick"),
+#                    name = "Clasificación") +
+#  labs(title = "2015–2020") +
+#  theme_minimal() +
+#  theme(
+#    axis.text = element_blank(),
+#    axis.title = element_blank()
+#  )
+#
+#legend_tp <- cowplot::get_legend(
+#  map_B_plot + theme(legend.position = "right")
+#)
+#map_B_plot <- map_B_plot + theme(legend.position = "none")
+#
+#final_tp_map <- plot_grid(
+#  plot_grid(map_A_plot, map_B_plot, ncol = 2),
+#  legend_tp,
+#  rel_widths = c(0.9, 0.1)
+#)
+#
+#final_tp_map <- ggdraw() +
+#  draw_label("Census tracts por encima y por debajo del tipping point para minorías",
+#             fontface = "bold",
+#             size = 16,
+#             y = 0.98) +
+#  draw_plot(final_tp_map, y = 0, height = 0.95)
+#
+# Mostrar
+#final_tp_map"
+#
