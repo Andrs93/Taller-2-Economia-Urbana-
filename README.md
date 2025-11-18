@@ -9,3 +9,5 @@ Los scripts combinan **análisis econométrico** y **herramientas de análisis e
 - y el diseño de un **Plan de Análisis Pre-especificado (PAP)** para un experimento de correspondencia sobre **discriminación en el mercado de alquiler en Suecia**.
 
 Si bien los códigos se desarrollaron en un entorno académico, se presentan como **ejercicios aplicados** cuyo propósito es trasladar el aprendizaje del curso a contextos prácticos y ofrecer ejemplos **reproducibles** de trabajo empírico en economía urbana.
+
+Es indispensable que, para la ejecución correcta de los códigos, se creen las carpetas **Data** y **Outputs** en la dirección de trabajo, para evitar tener problemas y una mejor organización del trabajo. La carpeta Data será donde se guarden todos las bases de datos y la carpeta Outputs será donde se depositen todas las tablas y gráficas usadas para el ejercicio.
