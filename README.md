@@ -17,6 +17,34 @@ Es indispensable que, para la ejecución correcta de los códigos, se creen las 
 
 ¡Muchas gracias!
 
+## Ejercicio 1 – Aglomeración y precios de restaurantes en Milán
+
+En este ejercicio se replica parte del análisis de **Leonardi & Moretti (2023)** para estudiar la
+**distribución espacial y la estructura de precios de los restaurantes en Milán** en dos años
+(2004 y 2012), utilizando información georreferenciada por barrio (*zona180*).
+
+El código de este ejercicio:
+
+- **Replica la Figura 1 de Leonardi & Moretti (2023)**  
+  - Mapas del número de restaurantes per cápita y de su crecimiento entre 2004 y 2012.  
+  - Discusión de cómo cambia la geografía de la oferta gastronómica en la ciudad.
+
+- Analiza la **distribución de precios** de los restaurantes  
+  - Estimación no paramétrica (KDE) de la distribución de precios con distintos kernels  
+    (Epanechnikov y Gaussiano) y anchos de banda tipo *rule-of-thumb*.  
+  - Ejercicios de sensibilidad variando el ancho de banda (mitad, estándar y doble)  
+    y comparación gráfica de las distribuciones para 2004 y 2012.  
+  - Discusión sobre **concentración de precios** y su interpretación económica.
+
+- Implementa el **test de Duranton & Overman (2005)**  
+  - Aplicado a los cinco barrios con mayor crecimiento en el número de restaurantes per cápita.  
+  - Uso de distancias entre establecimientos para evaluar patrones de **localización vs. dispersión**.  
+  - Análisis de si existe evidencia de aglomeración espacial en cada uno de los barrios y años.
+
+En conjunto, el ejercicio proporciona un ejemplo reproducible de cómo combinar
+**técnicas de densidad no paramétrica** y **tests de localización espacial** para estudiar mercados
+locales de servicios, en este caso el mercado de restaurantes de Milán.
+
 
 
 
