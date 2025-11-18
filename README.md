@@ -1,6 +1,6 @@
 # Taller-2-Economia-Urbana-
 
-En el marco del curso **Economía Urbana (ECON 4683, 2025-2)**, este repositorio reúne código completamente replicable en **R** correspondiente al **Taller 2: Aglomeración, Segregación y Discriminación**.
+En el marco del curso **Economía Urbana (ECON 4683, 2025-2)**, este repositorio reúne código y la resolución de los distintos ejercicios propuestos, completamente replicable en **R** correspondiente al **Taller 2: Aglomeración, Segregación y Discriminación**.
 
 Los scripts combinan **análisis econométrico** y **herramientas de análisis espacial** para abordar tres aplicaciones empíricas:
 
