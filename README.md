@@ -27,16 +27,16 @@ En este ejercicio analizamos la **distribución racial en la ciudad de Chicago**
 
 El código de este ejercicio:
 
-- construye **mapas** de la evolución de la proporción de:
+- Construye **mapas** de la evolución de la proporción de:
   - Afroamericanos  
   - Hispanos  
-- relaciona estos patrones espaciales con el **ingreso mediano del barrio**;
-- calcula, para varios años, los **índices de Dissimilarity e Isolation** para:
+- Relaciona estos patrones espaciales con el **ingreso mediano del barrio**;
+- Calcula, para varios años, los **índices de Dissimilarity e Isolation** para:
   - Afroamericanos vs. Blancos  
   - Hispanos vs. Blancos  
-- estima los **tipping points**:
-  - para minorías en general  
-  - y por grupo específico (Afroamericanos e Hispanos),
+- Estima los **tipping points**:
+  - Para minorías en general  
+  - Y por grupo específico (Afroamericanos e Hispanos),
   analizando cómo cambian en el tiempo y cómo se redistribuyen los barrios a ambos lados del punto de quiebre.
 
 En conjunto, este ejercicio ofrece un ejemplo reproducible de **medición empírica de segregación urbana**, combinando herramientas de análisis espacial, estadística descriptiva e interpretación económica de los resultados.
