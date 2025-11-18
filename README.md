@@ -10,7 +10,12 @@ Los scripts combinan **análisis econométrico** y **herramientas de análisis e
 
 Si bien los códigos se desarrollaron en un entorno académico, se presentan como **ejercicios aplicados** cuyo propósito es trasladar el aprendizaje del curso a contextos prácticos y ofrecer ejemplos **reproducibles** de trabajo empírico en economía urbana.
 
+Este repositorio se divide en dos ramas principales: **Main **, la cual es donde está el readme que estás leyendo y que contiene las principales instrucciones del ejercicio; **Taller PDF ** donde está subido el taller completo en formato PDF y **Códigos **, donde se encuentran los RScripts utilizados para cada uno de los puntos. Es indispensable que, para la ejecución correcta de los códigos, se creen las carpetas **Data ** y *Outputs * en la dirección de trabajo, para evitar tener problemas y una mejor organización del trabajo. La carpeta Data será donde se guarden todos las bases de datos y la carpeta Outputs será donde se depositen todas las tablas y gráficas usadas para los ejercicios que así lo requieran. 
+
+
 Es indispensable que, para la ejecución correcta de los códigos, se creen las carpetas **Data** y **Outputs** en la dirección de trabajo, para evitar tener problemas y una mejor organización del trabajo. La carpeta Data será donde se guarden todos las bases de datos y la carpeta Outputs será donde se depositen todas las tablas y gráficas usadas para el ejercicio.
+
+¡Muchas gracias!
 
 
 
