@@ -1,0 +1,268 @@
+###############################################################################
+# Economía Urbana - Taller 2
+# Juan Camilo Arévalo, Andrés Serrano, Juan Felipe Duarte
+# 17 de noviembre de 2025
+###############################################################################
+
+###############################################################################
+# PUNTO 3
+###############################################################################
+
+# Sección 1: Limpieza y recolección de datos:
+
+#Consola limpia para iniciar a trabajar:
+rm(list = ls())
+
+#Instalamos pacman para poder instalar todos los paquetes
+if (!require("pacman")) install.packages("pacman")  
+library(pacman)
+
+#Se instalan paquetes necesarios con el comando p_load
+p_load(tidyverse, rio, skimr, here, leaflet, lubridate, modelsummary, viridis, sf,
+       osmdata, dplyr, haven, stargazer, ggspatial, ragg, scales, fixest, FNN, 
+       sandwich, lmtest, splines, cowplot, segmented, purrr)
+
+#Procedemos a definir el directorio
+usuario <- Sys.info()[["user"]]
+
+if (usuario == "JUANC") {
+  directorio <- "C:/Users/JUANC/OneDrive - Universidad de los Andes/A-Uniandes/2025-20/Economía Urbana/Talleres/Taller 2" # Juan C.
+  
+} else if (usuario == " ") {
+  directorio <- " " # Andrés
+  
+} else if (usuario == " ") {
+  directorio <- " " # JF
+  
+} else if (usuario == " ") {
+  directorio <- " " # Ingresar aquí el directorio para replicación
+  
+} else {
+  stop("Usuario no reconocido. Por favor agregue su ruta.")
+}
+setwd(directorio)
+getwd()
+
+#Semilla para lograr reproducibilidad
+set.seed(123)
+
+#-------------------------------------------------------------------------------
+# 1) Definición de parámetros verdaderos
+
+K_PROFILES       <- 5           # Nº de perfiles por anuncio
+P0_TRUE          <- 0.62        # Tasa base hombre sueco
+BETA_SWEF_TRUE   <-  0.03       # Efecto mujer sueca
+BETA_LATH_TRUE   <- -0.22       # Efecto hombre latino
+BETA_LATF_TRUE   <- -0.19       # Efecto mujer latina
+BETA_MUS_TRUE    <- -0.36       # Efecto hombre musulmán
+
+# Heterogeneidad para solicitante musulmán
+DELTA1_TRUE      <- -0.15       # interacción MUS × caro
+DELTA2_TRUE      <- -0.05       # interacción MUS × agente (efecto heterogéneo de interés)
+
+# Efectos de contexto (moderados)
+GAMMA_PRIV_TRUE  <-  0.00       # efecto arrendador privado (dummy contexto)
+GAMMA_METRO_TRUE <-  0.00       # efecto zona metro
+GAMMA_CARO_TRUE  <- -0.05       # efecto vivienda cara
+
+ALPHA            <- 0.05        # nivel de significancia
+
+#-------------------------------------------------------------------------------
+# 2) Función para generar una base para un j dado
+
+generar_datos <- function(J) {
+  id_anuncio <- rep(1:J, each = K_PROFILES)
+  
+#Se define que el 55% de las observaciones son de agentes inmobiliarios:
+  agente_j  <- rbinom(J, size = 1, prob = 0.55)
+  privado_j <- 1 - agente_j
+  
+#Se define que el 70% está en zona metropolitana:
+  metro_j <- rbinom(J, size = 1, prob = 0.70)
+  
+#Se define el Valor: 15% Alto, 50% Medio, 35% Bajo
+  valor_j <- sample(
+    x       = c("Alto", "Medio", "Bajo"),
+    size    = J,
+    replace = TRUE,
+    prob    = c(0.15, 0.50, 0.35)
+  )
+  
+#Se crea la Dummy de Caro = 1 si "Alto"
+  caro_j <- as.integer(valor_j == "Alto")
+  
+#Se replicar a nivel (i,j)
+  privado <- rep(privado_j, each = K_PROFILES)
+  metro   <- rep(metro_j,   each = K_PROFILES)
+  caro    <- rep(caro_j,    each = K_PROFILES)
+  valor   <- rep(valor_j,   each = K_PROFILES)
+  
+#Ahora, se construyen los perfiles
+  perfiles <- c("SWE_M", "SWE_F", "LAT_M", "LAT_F", "MUS_M")
+  perfil   <- rep(perfiles, times = J)
+  
+  SWE_F <- as.integer(perfil == "SWE_F")
+  LAT_M <- as.integer(perfil == "LAT_M")
+  LAT_F <- as.integer(perfil == "LAT_F")
+  MUS_M <- as.integer(perfil == "MUS_M")  # efecto principal de interés
+  
+#Revisión de Probabilidad verdadera p_ij según el modelo lineal descrito
+  p <- P0_TRUE +
+    BETA_SWEF_TRUE * SWE_F +
+    BETA_LATH_TRUE * LAT_M +
+    BETA_LATF_TRUE * LAT_F +
+    BETA_MUS_TRUE  * MUS_M +
+    GAMMA_PRIV_TRUE  * privado +
+    GAMMA_METRO_TRUE * metro +
+    GAMMA_CARO_TRUE  * caro +
+    DELTA1_TRUE * (MUS_M * caro) +
+    DELTA2_TRUE * (MUS_M * privado)
+  
+#Revisar que 0 < p < 1
+  p <- pmin(pmax(p, 0.01), 0.99)
+  
+#Revisar que el resultado binario Y_ij ~ Bernoulli(p_ij)
+  y <- rbinom(J * K_PROFILES, size = 1, prob = p)
+  
+  data.frame(
+    id_anuncio = id_anuncio,
+    perfil     = perfil,
+    SWE_F      = SWE_F,
+    LAT_M      = LAT_M,
+    LAT_F      = LAT_F,
+    MUS_M      = MUS_M,
+    privado    = privado,
+    metro      = metro,
+    caro       = caro,
+    valor      = factor(valor, levels = c("Bajo", "Medio", "Alto"),
+                        ordered = TRUE),
+    y          = y
+  )
+}
+
+#-------------------------------------------------------------------------------
+# 3) Prueba de MPL con una réplica
+############################################################
+
+una_replicacion <- function(J) {
+  datos <- generar_datos(J)
+  
+# LPM ya especificado
+  mod <- lm(
+    y ~ SWE_F + LAT_M + LAT_F + MUS_M +
+      privado + metro + caro +
+      MUS_M:caro + MUS_M:privado,
+    data = datos
+  )
+  
+# Errores estándar agrupados a nivel anuncio
+  V_cl <- sandwich::vcovCL(mod, cluster = ~ id_anuncio)
+  res  <- lmtest::coeftest(mod, vcov = V_cl)
+  
+  c(
+    beta_MUS      = res["MUS_M", "Estimate"],
+    se_MUS        = res["MUS_M", "Std. Error"],
+    p_MUS         = res["MUS_M", "Pr(>|t|)"],
+    beta_MUS_priv = res["MUS_M:privado", "Estimate"],  # efecto heterogéneo
+    se_MUS_priv   = res["MUS_M:privado", "Std. Error"],
+    p_MUS_priv    = res["MUS_M:privado", "Pr(>|t|)"]
+  )
+}
+
+#-------------------------------------------------------------------------------
+# 4) Se simulan las 1000 réplicas para los tamaños de muestra
+
+simular_poder_J <- function(J, R = 1000) {
+  mat <- replicate(R, una_replicacion(J))
+  mat <- t(mat)
+  
+  data.frame(
+    J                   = J,
+    poder_MUS           = mean(mat[, "p_MUS"]      < ALPHA),
+    poder_MUS_priv      = mean(mat[, "p_MUS_priv"] < ALPHA),  # Efecto Het.
+    beta_MUS_media      = mean(mat[, "beta_MUS"]),
+    beta_MUS_sd         = sd(mat[, "beta_MUS"]),
+    beta_MUS_priv_media = mean(mat[, "beta_MUS_priv"]),
+    beta_MUS_priv_sd    = sd(mat[, "beta_MUS_priv"])
+  )
+}
+
+#-------------------------------------------------------------------------------
+# 5) Se crean las simulaciones para J = 100, 300, 500, 800, 1000
+
+
+J_vals <- c(100, 300, 500, 800, 1000)
+R_reps <- 1000
+
+set.seed(2025)
+
+lista_res   <- lapply(J_vals, simular_poder_J, R = R_reps)
+tabla_poder <- bind_rows(lista_res)
+
+tabla_poder
+
+#-------------------------------------------------------------------------------
+# 6) Construcción tabla final con todos los efectos (ppal y heterogéneo).
+
+
+tabla_poder_het <- tabla_poder %>%
+  dplyr::select(J,
+         poder_efecto_principal = poder_MUS,
+         poder_heterogeneo      = poder_MUS_priv,
+         beta_MUS_priv_media,
+         beta_MUS_priv_sd)
+
+tabla_poder_het
+
+stargazer(
+  tabla_poder_het,
+  summary = FALSE,
+  rownames = FALSE,
+  title = "Resultados de Poder Heterogéneos",
+  label = "tab:poder_het",
+  digits = 3,
+  out = "Outputs/poder_het.tex"
+)
+#-------------------------------------------------------------------------------
+# 7) Gráfico Opcional para Efecto Heterogéneo
+
+gg_poder_het <- ggplot(tabla_poder,
+                       aes(x = J, y = poder_MUS_priv)) +
+  geom_line(size = 1) +
+  geom_point(size = 2.5) +
+  geom_hline(yintercept = 0.80, linetype = "dashed") +
+  annotate("text",
+           x     = max(tabla_poder$J),
+           y     = 0.82,
+           label = "Umbral de poder del 80 %",
+           hjust = 1,
+           size  = 3) +
+  scale_y_continuous(
+    limits = c(0, 1),
+    breaks = seq(0, 1, by = 0.1),
+    labels = percent_format(accuracy = 1)
+  ) +
+  scale_x_continuous(
+    breaks = J_vals
+  ) +
+  labs(
+    title    = "Poder para detectar efectos heterogéneos según origen/tipo del arrendador",
+    subtitle = "Probabilidad de rechazar H0: δ₂ = 0 (interacción solicitante musulmán × arrendador privado)",
+    x        = "Número de anuncios (J)",
+    y        = "Poder para el efecto heterogéneo (MUS × Privado)",
+    caption  = paste0(
+      "Notas: Cada punto se basa en ", R_reps,
+      " réplicas Monte Carlo bajo el DGP pre–especificado.\n",
+      "El modelo incluye efectos principales de perfil y controles de anuncio, ",
+      "con errores estándar agrupados a nivel de anuncio."
+    )
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    plot.title      = element_text(face = "bold"),
+    plot.subtitle   = element_text(size = 10),
+    axis.title      = element_text(face = "bold"),
+    panel.grid.minor = element_blank()
+  )
+
+gg_poder_het
