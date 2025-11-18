@@ -1,8 +1,3 @@
-
-required_pkgs <- c("sf","ggplot2","dplyr","tidyr","viridis","MASS","geosphere","gridExtra")
-to_install <- required_pkgs[!(required_pkgs %in% installed.packages()[,"Package"])]
-if(length(to_install)) install.packages(to_install, repos = "https://cloud.r-project.org")
-
 library(sf)
 library(ggplot2)
 library(dplyr)
@@ -139,9 +134,6 @@ figura1<-plot_grid(
 )
 
 ggsave("outputs1/figura1.png", figura1, width=8, height=5)
-# Comentario breve (guardar en txt)
-cat("Figura 1 replicada: outputs/Figura1_replicacion.png\n",
-    file = "outputs1/README_replica.txt", append = FALSE)
 # ----------------------------
 # 2) Distribución de precios (no paramétrica)
 # ----------------------------
@@ -369,12 +361,8 @@ write.csv(summary_tbl, "outputs1/do_tests_summary.csv", row.names = FALSE)
 # mostrar tabla resumen en pantalla
 print(summary_tbl)
 
-# combinar las figuras en un pdf (opcional)
 png("outputs1/DO_tests_combined.png", width = 12*300, height = 8*300, res = 300)
 grid.arrange(grobs = lapply(results_list, function(x) x$plot), ncol = 2)
 dev.off()
 
-# ----------------------------
-# Fin del script
-# ----------------------------
-cat("En la carpeta 'outputs1/' esta la figura y graficas \n")
+
